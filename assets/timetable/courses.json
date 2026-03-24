@@ -1,0 +1,16 @@
+[
+  {
+"id": "c1",
+"code": "CSE101",
+"section": "01",
+"name": "프로그래밍기초",
+"type": "majorRequired",
+"credit": 3,
+"professor": "홍길동",
+"tags": ["AI", "데이터", "백엔드"],
+"times": [
+      {"day": "mon", "start": "09:00", "end": "10:15", "building": "공학관", "room": "201"},
+      {"day": "wed", "start": "09:00", "end": "10:15", "building": "공학관", "room": "201"}
+    ]
+  }
+]
