@@ -1,79 +1,39 @@
 class AuthUser {
-  final String id;
   final String email;
   final String nickname;
   final String department;
   final int? entranceYear;
+  final bool isVerifiedStudent;
   final bool profileCompleted;
 
   const AuthUser({
-    required this.id,
     required this.email,
     required this.nickname,
     required this.department,
     required this.entranceYear,
+    required this.isVerifiedStudent,
     required this.profileCompleted,
   });
 
-  factory AuthUser.empty() {
-    return const AuthUser(
-      id: '',
-      email: '',
-      nickname: '',
-      department: '',
-      entranceYear: null,
-      profileCompleted: false,
-    );
-  }
-
-  AuthUser copyWith({
-    String? id,
-    String? email,
-    String? nickname,
-    String? department,
-    int? entranceYear,
-    bool? profileCompleted,
-  }) {
+  factory AuthUser.fromMap(Map<String, dynamic> map) {
     return AuthUser(
-      id: id ?? this.id,
-      email: email ?? this.email,
-      nickname: nickname ?? this.nickname,
-      department: department ?? this.department,
-      entranceYear: entranceYear ?? this.entranceYear,
-      profileCompleted: profileCompleted ?? this.profileCompleted,
+      email: (map['email'] ?? '').toString(),
+      nickname: (map['nickname'] ?? '').toString(),
+      department: (map['department'] ?? '').toString(),
+      entranceYear: (map['entranceYear'] as num?)?.toInt(),
+      isVerifiedStudent: map['isVerifiedStudent'] == true,
+      profileCompleted: map['profileCompleted'] == true,
     );
   }
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toMap() {
     return {
-      'id': id,
       'email': email,
       'nickname': nickname,
       'department': department,
       'entranceYear': entranceYear,
+      'isVerifiedStudent': isVerifiedStudent,
       'profileCompleted': profileCompleted,
     };
-  }
-
-  factory AuthUser.fromJson(Map<String, dynamic> json) {
-    return AuthUser(
-      id: (json['id'] ?? '').toString(),
-      email: (json['email'] ?? '').toString(),
-      nickname: (json['nickname'] ?? '').toString(),
-      department: (json['department'] ?? '').toString(),
-      entranceYear: _parseNullableInt(json['entranceYear']),
-      profileCompleted: json['profileCompleted'] == true,
-    );
-  }
-
-  static int? _parseNullableInt(dynamic value) {
-    if (value == null) return null;
-    if (value is int) return value;
-    return int.tryParse(value.toString());
-  }
-
-  @override
-  String toString() {
-    return 'AuthUser(id: $id, email: $email, nickname: $nickname, department: $department, entranceYear: $entranceYear, profileCompleted: $profileCompleted)';
   }
 }

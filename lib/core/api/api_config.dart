@@ -21,10 +21,8 @@ class ApiConfig {
     switch (defaultTargetPlatform) {
       case TargetPlatform.iOS:
         return 'http://localhost:8080';
-
       case TargetPlatform.android:
         return 'http://10.0.2.2:8080';
-
       default:
         return _lanBaseUrl;
     }

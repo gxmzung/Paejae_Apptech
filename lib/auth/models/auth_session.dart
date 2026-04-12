@@ -1,63 +1,39 @@
-import 'auth_user.dart';
+class AuthUser {
+  final String email;
+  final String nickname;
+  final String department;
+  final int? entranceYear;
+  final bool isVerifiedStudent;
+  final bool profileCompleted;
 
-class AuthSession {
-  final String accessToken;
-  final String refreshToken;
-  final AuthUser user;
-  final bool isLoggedIn;
-
-  const AuthSession({
-    required this.accessToken,
-    required this.refreshToken,
-    required this.user,
-    required this.isLoggedIn,
+  const AuthUser({
+    required this.email,
+    required this.nickname,
+    required this.department,
+    required this.entranceYear,
+    required this.isVerifiedStudent,
+    required this.profileCompleted,
   });
 
-  factory AuthSession.empty() {
-    return AuthSession(
-      accessToken: '',
-      refreshToken: '',
-      user: AuthUser.empty(),
-      isLoggedIn: false,
+  factory AuthUser.fromMap(Map<String, dynamic> map) {
+    return AuthUser(
+      email: (map['email'] ?? '').toString(),
+      nickname: (map['nickname'] ?? '').toString(),
+      department: (map['department'] ?? '').toString(),
+      entranceYear: (map['entranceYear'] as num?)?.toInt(),
+      isVerifiedStudent: map['isVerifiedStudent'] == true,
+      profileCompleted: map['profileCompleted'] == true,
     );
   }
 
-  AuthSession copyWith({
-    String? accessToken,
-    String? refreshToken,
-    AuthUser? user,
-    bool? isLoggedIn,
-  }) {
-    return AuthSession(
-      accessToken: accessToken ?? this.accessToken,
-      refreshToken: refreshToken ?? this.refreshToken,
-      user: user ?? this.user,
-      isLoggedIn: isLoggedIn ?? this.isLoggedIn,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toMap() {
     return {
-      'accessToken': accessToken,
-      'refreshToken': refreshToken,
-      'user': user.toJson(),
-      'isLoggedIn': isLoggedIn,
+      'email': email,
+      'nickname': nickname,
+      'department': department,
+      'entranceYear': entranceYear,
+      'isVerifiedStudent': isVerifiedStudent,
+      'profileCompleted': profileCompleted,
     };
-  }
-
-  factory AuthSession.fromJson(Map<String, dynamic> json) {
-    return AuthSession(
-      accessToken: (json['accessToken'] ?? '').toString(),
-      refreshToken: (json['refreshToken'] ?? '').toString(),
-      user: AuthUser.fromJson(
-        Map<String, dynamic>.from(json['user'] ?? const {}),
-      ),
-      isLoggedIn: json['isLoggedIn'] == true,
-    );
-  }
-
-  @override
-  String toString() {
-    return 'AuthSession(accessToken: $accessToken, refreshToken: $refreshToken, isLoggedIn: $isLoggedIn, user: $user)';
   }
 }

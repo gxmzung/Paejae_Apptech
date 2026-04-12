@@ -3,13 +3,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:apptech_flutter/core/api/api_config.dart';
 
-import '../models/auth_session.dart';
-import '../models/auth_user.dart';
-
 class AuthApiService {
-  AuthApiService({
-    http.Client? client,
-  }) : _client = client ?? http.Client();
+  AuthApiService({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
 
@@ -25,39 +20,31 @@ class AuthApiService {
   };
 
   Future<void> requestOtp(String email) async {
-    final uri = _uri('/auth/request-otp');
-
     final res = await _client.post(
-      uri,
+      _uri('/auth/request-otp'),
       headers: _jsonHeaders,
-      body: jsonEncode({
-        'email': email.trim().toLowerCase(),
-      }),
+      body: jsonEncode({'email': email.trim().toLowerCase()}),
     );
 
     final body = _tryDecodeJson(res.body);
 
     if (res.statusCode < 200 || res.statusCode >= 300 || body['ok'] == false) {
       throw Exception(
-        _extractMessage(body, fallback: '인증번호 발송에 실패했습니다.'),
+        _extractMessage(body, fallback: '인증번호 발송에 실패했어요.'),
       );
     }
   }
 
-  Future<AuthVerifyResult> verifyOtp({
+  Future<void> verifyOtp({
     required String email,
     required String code,
-    required bool isLogin,
   }) async {
-    final uri = _uri('/auth/verify-otp');
-
     final res = await _client.post(
-      uri,
+      _uri('/auth/verify-otp'),
       headers: _jsonHeaders,
       body: jsonEncode({
         'email': email.trim().toLowerCase(),
         'code': code.trim(),
-        'mode': isLogin ? 'login' : 'signup',
       }),
     );
 
@@ -65,47 +52,9 @@ class AuthApiService {
 
     if (res.statusCode < 200 || res.statusCode >= 300 || body['ok'] == false) {
       throw Exception(
-        _extractMessage(body, fallback: '인증번호 확인에 실패했습니다.'),
+        _extractMessage(body, fallback: '인증번호 확인에 실패했어요.'),
       );
     }
-
-    final bool isNewUser = !isLogin;
-
-    final session = AuthSession(
-      accessToken: '',
-      refreshToken: '',
-      user: AuthUser(
-        id: email,
-        email: email,
-        nickname: '',
-        department: '',
-        entranceYear: null,
-        profileCompleted: !isNewUser,
-      ),
-      isLoggedIn: true,
-    );
-
-    return AuthVerifyResult(
-      success: true,
-      isNewUser: isNewUser,
-      session: session,
-    );
-  }
-
-  Future<AuthUser> completeProfile({
-    required String email,
-    required String nickname,
-    required String department,
-    required int? entranceYear,
-  }) async {
-    return AuthUser(
-      id: email,
-      email: email,
-      nickname: nickname,
-      department: department,
-      entranceYear: entranceYear,
-      profileCompleted: true,
-    );
   }
 
   Map<String, dynamic> _tryDecodeJson(String raw) {
@@ -139,16 +88,4 @@ class AuthApiService {
 
     return fallback;
   }
-}
-
-class AuthVerifyResult {
-  final bool success;
-  final bool isNewUser;
-  final AuthSession? session;
-
-  const AuthVerifyResult({
-    required this.success,
-    required this.isNewUser,
-    required this.session,
-  });
 }

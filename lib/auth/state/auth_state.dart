@@ -1,46 +1,62 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import '../services/firebase_auth_service.dart';
+import '../models/auth_user.dart';
+import '../services/auth_api_service.dart';
+import '../services/profile_store_service.dart';
 
 class AuthState extends ChangeNotifier {
   AuthState({
-    FirebaseAuthService? firebaseAuthService,
-  }) : _firebase = firebaseAuthService ?? FirebaseAuthService();
+    AuthApiService? api,
+    ProfileStoreService? profileStore,
+  })  : _api = api ?? AuthApiService(),
+        _profileStore = profileStore ?? ProfileStoreService();
 
-  final FirebaseAuthService _firebase;
+  final AuthApiService _api;
+  final ProfileStoreService _profileStore;
+
+  static const _kEmailKey = 'auth_email_v1';
+  static const _kVerifiedKey = 'auth_verified_v1';
 
   bool _isBooted = false;
   bool _isLoading = false;
   bool _isLoggedIn = false;
   bool _isProfileCompleted = false;
-  String? _errorMessage;
 
-  User? _user;
+  String? _email;
+  String? _errorMessage;
+  AuthUser? _user;
 
   bool get isBooted => _isBooted;
   bool get isLoading => _isLoading;
   bool get isLoggedIn => _isLoggedIn;
   bool get isProfileCompleted => _isProfileCompleted;
+  String? get email => _email;
   String? get errorMessage => _errorMessage;
-  User? get currentUser => _user;
+  AuthUser? get currentUser => _user;
 
   Future<void> boot() async {
     _setLoading(true);
     _clearError();
 
     try {
-      _user = _firebase.currentUser;
-      _isLoggedIn = _user != null;
+      final sp = await SharedPreferences.getInstance();
+      final savedEmail = sp.getString(_kEmailKey);
+      final verified = sp.getBool(_kVerifiedKey) ?? false;
 
-      if (_user != null) {
-        _isProfileCompleted =
-        await _firebase.isProfileCompleted(_user!.uid);
+      if (savedEmail != null && verified) {
+        _email = savedEmail;
+        _isLoggedIn = true;
+
+        final profile = await _profileStore.fetchProfile(savedEmail);
+        _user = profile;
+        _isProfileCompleted = profile?.profileCompleted == true;
       } else {
+        _isLoggedIn = false;
         _isProfileCompleted = false;
       }
     } catch (e) {
-      _errorMessage = _friendlyMessage(e);
+      _errorMessage = e.toString();
     } finally {
       _isBooted = true;
       _setLoading(false, notify: false);
@@ -48,69 +64,61 @@ class AuthState extends ChangeNotifier {
     }
   }
 
-  Future<bool> signUp({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> requestOtp(String email) async {
     _setLoading(true);
     _clearError();
 
     try {
-      final cred = await _firebase.signUpWithEmail(
-        email: email,
-        password: password,
-      );
+      final normalized = email.trim().toLowerCase();
 
-      _user = cred.user;
-      _isLoggedIn = _user != null;
-      _isProfileCompleted = false;
-
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _errorMessage = _friendlyMessage(e);
-      notifyListeners();
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  Future<bool> signIn({
-    required String email,
-    required String password,
-  }) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      final cred = await _firebase.signInWithEmail(
-        email: email,
-        password: password,
-      );
-
-      _user = cred.user;
-      _isLoggedIn = _user != null;
-
-      if (_user != null) {
-        _isProfileCompleted =
-        await _firebase.isProfileCompleted(_user!.uid);
-      } else {
-        _isProfileCompleted = false;
+      if (!normalized.endsWith('@pcu.ac.kr')) {
+        throw Exception('학교 이메일(@pcu.ac.kr)만 사용할 수 있어요.');
       }
 
-      notifyListeners();
-      return true;
+      await _api.requestOtp(normalized);
     } catch (e) {
-      _errorMessage = _friendlyMessage(e);
-      notifyListeners();
-      return false;
+      _errorMessage = _prettyError(e);
+      rethrow;
     } finally {
       _setLoading(false);
     }
   }
 
-  Future<bool> completeProfile({
+  Future<void> verifyOtp({
+    required String email,
+    required String code,
+  }) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      final normalized = email.trim().toLowerCase();
+
+      await _api.verifyOtp(
+        email: normalized,
+        code: code,
+      );
+
+      final sp = await SharedPreferences.getInstance();
+      await sp.setString(_kEmailKey, normalized);
+      await sp.setBool(_kVerifiedKey, true);
+
+      _email = normalized;
+      _isLoggedIn = true;
+
+      final profile = await _profileStore.fetchProfile(normalized);
+      _user = profile;
+      _isProfileCompleted = profile?.profileCompleted == true;
+    } catch (e) {
+      _errorMessage = _prettyError(e);
+      rethrow;
+    } finally {
+      _setLoading(false);
+      notifyListeners();
+    }
+  }
+
+  Future<void> completeProfile({
     required String nickname,
     required String department,
     required int? entranceYear,
@@ -119,47 +127,42 @@ class AuthState extends ChangeNotifier {
     _clearError();
 
     try {
-      final user = _user;
-      if (user == null) {
-        throw Exception('로그인 정보가 없습니다.');
+      final email = _email;
+      if (email == null || email.isEmpty) {
+        throw Exception('인증된 사용자 정보가 없어요.');
       }
 
-      await _firebase.saveUserProfile(
-        uid: user.uid,
-        email: user.email ?? '',
-        nickname: nickname.trim(),
-        department: department.trim(),
+      await _profileStore.saveProfile(
+        email: email,
+        nickname: nickname,
+        department: department,
         entranceYear: entranceYear,
       );
 
-      _isProfileCompleted = true;
-      notifyListeners();
-      return true;
+      final profile = await _profileStore.fetchProfile(email);
+      _user = profile;
+      _isProfileCompleted = profile?.profileCompleted == true;
     } catch (e) {
-      _errorMessage = _friendlyMessage(e);
-      notifyListeners();
-      return false;
+      _errorMessage = _prettyError(e);
+      rethrow;
     } finally {
       _setLoading(false);
+      notifyListeners();
     }
   }
 
   Future<void> logout() async {
-    _setLoading(true);
-    _clearError();
+    final sp = await SharedPreferences.getInstance();
+    await sp.remove(_kEmailKey);
+    await sp.remove(_kVerifiedKey);
 
-    try {
-      await _firebase.signOut();
+    _email = null;
+    _user = null;
+    _isLoggedIn = false;
+    _isProfileCompleted = false;
+    _errorMessage = null;
 
-      _user = null;
-      _isLoggedIn = false;
-      _isProfileCompleted = false;
-    } catch (e) {
-      _errorMessage = _friendlyMessage(e);
-    } finally {
-      _setLoading(false, notify: false);
-      notifyListeners();
-    }
+    notifyListeners();
   }
 
   void clearError() {
@@ -176,35 +179,9 @@ class AuthState extends ChangeNotifier {
     _errorMessage = null;
   }
 
-  String _friendlyMessage(Object error) {
-    if (error is FirebaseAuthException) {
-      switch (error.code) {
-        case 'invalid-email':
-          return '이메일 형식이 올바르지 않아요.';
-        case 'user-disabled':
-          return '비활성화된 계정이에요.';
-        case 'user-not-found':
-          return '가입되지 않은 계정이에요.';
-        case 'wrong-password':
-        case 'invalid-credential':
-          return '이메일 또는 비밀번호가 올바르지 않아요.';
-        case 'email-already-in-use':
-          return '이미 가입된 이메일이에요.';
-        case 'weak-password':
-          return '비밀번호가 너무 약해요. 6자 이상 입력해 주세요.';
-        case 'operation-not-allowed':
-          return '현재 이 로그인 방식은 사용할 수 없어요.';
-        case 'too-many-requests':
-          return '요청이 너무 많아요. 잠시 후 다시 시도해 주세요.';
-        case 'network-request-failed':
-          return '네트워크 연결을 확인해 주세요.';
-        default:
-          return error.message?.trim().isNotEmpty == true
-              ? error.message!.trim()
-              : '인증 처리 중 오류가 발생했어요.';
-      }
-    }
-
-    return error.toString();
+  String _prettyError(Object e) {
+    final raw = e.toString().replaceFirst('Exception: ', '').trim();
+    if (raw.isEmpty) return '알 수 없는 오류가 발생했어요.';
+    return raw;
   }
 }

@@ -20,16 +20,16 @@ import 'package:apptech_flutter/features/clubs/presentation/club_all_screen.dart
 import 'package:apptech_flutter/auth/state/auth_state.dart';
 import 'package:apptech_flutter/auth/screens/login_screen.dart';
 import 'package:apptech_flutter/auth/screens/signup_screen.dart';
+import 'package:apptech_flutter/auth/screens/otp_verify_screen.dart';
 import 'package:apptech_flutter/auth/screens/student_profile_screen.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    await Firebase.initializeApp();
 
-  await Firebase.initializeApp();
-
-  runZonedGuarded(() {
     FlutterError.onError = (FlutterErrorDetails details) {
       FlutterError.dumpErrorToConsole(details);
       debugPrint('🧨 FlutterError: ${details.exception}');
@@ -125,6 +125,15 @@ class _AppState extends State<App> {
           SignupScreen.routeName: (_) => const SignupScreen(),
           StudentProfileScreen.routeName: (_) => const StudentProfileScreen(),
         },
+        onGenerateRoute: (settings) {
+          if (settings.name == OtpVerifyScreen.routeName) {
+            final args = settings.arguments as OtpVerifyArgs;
+            return MaterialPageRoute(
+              builder: (_) => OtpVerifyScreen(args: args),
+            );
+          }
+          return null;
+        },
       ),
     );
   }
@@ -137,18 +146,9 @@ class AuthGate extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AuthState>(
       builder: (context, auth, _) {
-        if (!auth.isBooted) {
-          return const _SplashScreen();
-        }
-
-        if (!auth.isLoggedIn) {
-          return const LoginScreen();
-        }
-
-        if (!auth.isProfileCompleted) {
-          return const StudentProfileScreen();
-        }
-
+        if (!auth.isBooted) return const _SplashScreen();
+        if (!auth.isLoggedIn) return const LoginScreen();
+        if (!auth.isProfileCompleted) return const StudentProfileScreen();
         return const RootScreen();
       },
     );
@@ -161,9 +161,7 @@ class _SplashScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      body: Center(
-        child: CircularProgressIndicator(),
-      ),
+      body: Center(child: CircularProgressIndicator()),
     );
   }
 }
